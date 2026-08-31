@@ -15,20 +15,38 @@ from analyst import explain_result
 import os
 DB_PATH = "database/insight_ai.db"
 
+import os
+
 def ensure_database_exists():
-    """If insight_ai.db doesn't exist yet (e.g. fresh deployment where the
-    .db file was gitignored), build it from the CSV automatically."""
+    """Build the database from the CSV if it's missing OR if it exists but
+    is empty/broken (e.g. leftover from an earlier failed deploy)."""
+    needs_rebuild = True
+
     if os.path.exists(DB_PATH):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='orders';"
+            )
+            if cur.fetchone() is not None:
+                needs_rebuild = False
+            conn.close()
+        except Exception:
+            needs_rebuild = True
+
+    if not needs_rebuild:
         return
 
     csv_path = "data/superstore.csv"
+    df = None
     for encoding in ["utf-8", "cp1252", "latin1"]:
         try:
             df = pd.read_csv(csv_path, encoding=encoding)
             break
         except UnicodeDecodeError:
             continue
-    else:
+
+    if df is None:
         raise RuntimeError("Could not read the CSV with any common encoding.")
 
     df.columns = [c.strip().lower().replace(" ", "_").replace("-", "_") for c in df.columns]
