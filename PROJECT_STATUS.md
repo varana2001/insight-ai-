@@ -160,3 +160,11 @@ deliberately, one small piece at a time, with the user running and verifying
 each piece themselves before moving on. Give code in small chunks tied to one
 file at a time, not large multi-file dumps, and ask the user to run and report
 back before proceeding.
+
+⚠️ Hit Gemini free tier daily quota (20 requests/day) during testing on
+   [today's date]. Confirms need for: (1) graceful error handling for
+   rate-limit errors specifically, not just generic exceptions, and
+   (2) awareness that a deployed public app could hit this limit if
+   multiple people try it — worth mentioning as a known constraint when
+   discussing this project, and a real reason a production system would
+   need a paid tier or its own rate-limiting/caching layer.
