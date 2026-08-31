@@ -1,8 +1,6 @@
 # InsightAI — AI-Powered Business Data Analyst
 
-Progress: **Steps 1–3 complete** (data, database, Python↔SQLite verification).
-Next: Step 4 (Streamlit UI, no AI yet).
-
+Progress: **Steps 1–10 complete** 
 ## What's here right now
 - `data/` — synthetic e-commerce CSVs (customers, products, orders, returns)
   with realistic patterns: a February 2026 revenue dip (~50% drop, driven by
@@ -12,6 +10,13 @@ Next: Step 4 (Streamlit UI, no AI yet).
 - `database/create_database.py` — loads CSVs into SQLite (safe to re-run, rebuilds from scratch each time)
 - `test_query.py` — proves the Python → SQLite → Pandas pipeline works
 
+- **Step 4**: A Streamlit UI with hardcoded buttons for these same queries — no AI yet
+- **Step 5**: Add Gemini (or Claude) to convert natural-language questions into SQL
+- **Step 6**: Auto-extract the schema instead of hardcoding it in the prompt
+- **Step 7**: SQL validation (SELECT-only)
+- **Step 8**: Self-correction loop when generated SQL fails
+- **Step 9**: Auto-generated charts (Plotly)
+- **Step 10**: AI business explanation of results
 ## How to run this on your machine (VS Code)
 
 1. Open the `insight-ai` folder in VS Code (`File > Open Folder`)
@@ -51,11 +56,5 @@ This is the "learn the database using normal Python first" step — get comforta
 here before Step 4 adds a UI and Step 5 adds the AI.
 
 ## What's next (don't build these yet)
-- **Step 4**: A Streamlit UI with hardcoded buttons for these same queries — no AI yet
-- **Step 5**: Add Gemini (or Claude) to convert natural-language questions into SQL
-- **Step 6**: Auto-extract the schema instead of hardcoding it in the prompt
-- **Step 7**: SQL validation (SELECT-only)
-- **Step 8**: Self-correction loop when generated SQL fails
-- **Step 9**: Auto-generated charts (Plotly)
-- **Step 10**: AI business explanation of results
+
 - **Later**: LangGraph, conversation memory, testing, GitHub, free deployment
