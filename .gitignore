@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 database/insight_ai.db
 .env
+graph_diagram.png

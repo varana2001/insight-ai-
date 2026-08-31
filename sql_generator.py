@@ -1,11 +1,9 @@
 """
 sql_generator.py
 -----------------
-Step 8: generate_sql() now optionally accepts feedback from a previous failed
-attempt (the bad SQL + the error it caused), so it can be told what went
-wrong and try again. The retry loop itself lives in app.py, not here — this
-file's only job is still "given a question (and optional error context),
-produce SQL."
+Now accepts optional conversation_context, so references like "that region"
+or "now break it down by month" can be resolved using recent conversation
+history rather than treating every question as fully independent.
 """
 
 import os
@@ -21,13 +19,15 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_NAME = "gemini-3.6-flash"
 
 
-def generate_sql(question: str, previous_sql: str = None, previous_error: str = None) -> str:
+def generate_sql(
+    question: str,
+    previous_sql: str = None,
+    previous_error: str = None,
+    conversation_context: str = "",
+) -> str:
     """
-    Sends the question + live schema to Gemini and returns raw SQL.
-
-    If previous_sql and previous_error are provided, includes them in the
-    prompt so Gemini can see exactly what it tried and why it failed,
-    instead of guessing blind on a retry.
+    Sends the question + live schema (+ optional error-correction context +
+    optional recent conversation history) to Gemini and returns raw SQL.
     """
     schema = get_schema_description()
 
@@ -43,11 +43,21 @@ Error it caused:
 {previous_error}
 """
 
+    context_block = ""
+    if conversation_context:
+        context_block = f"""
+{conversation_context}
+
+If the current question references something from the conversation history
+above (e.g. "that region", "the same period", "now break it down by X"),
+use the history to resolve what it's referring to.
+"""
+
     prompt = f"""You are an expert SQL analyst.
 You write SQLite SELECT queries only, based on this schema:
 
 {schema}
-
+{context_block}
 Rules:
 - Only write SELECT statements. Never write DDL or DML.
 - Only use tables and columns that appear in the schema above.

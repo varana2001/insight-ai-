@@ -129,7 +129,6 @@ python-dotenv
 - ⬜ **Step 10 — AI business explanation**: turn the raw query result into a
   2-3 sentence plain-English business explanation (separate LLM call).
 
-## STEPS NOT YET STARTED
 
 - ⬜ **LangGraph**: convert the linear pipeline into an actual graph with
   conditional routing (safe/unsafe SQL) and the self-correction loop as a

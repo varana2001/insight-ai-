@@ -8,11 +8,11 @@ so you can compare the AI's output against your own known-correct queries.
 import sqlite3
 import pandas as pd
 import streamlit as st
-from sql_generator import generate_sql
-from sql_validator import is_safe_sql
 from chart_generator import pick_chart
-from analyst import explain_result
+from graph import run_pipeline
 import os
+import memory
+
 DB_PATH = "database/insight_ai.db"
 
 import os
@@ -72,10 +72,13 @@ def run_query(sql: str) -> pd.DataFrame:
         conn.close()
     return df
 
-
 st.set_page_config(page_title="InsightAI", layout="wide")
 st.title("InsightAI")
 st.caption("AI-Powered Business Data Analyst")
+
+if st.sidebar.button("Clear conversation memory"):
+    memory.clear_history()
+    st.sidebar.success("Conversation history cleared")
 
 # ---------- STEP 5: Ask in natural language ----------
 st.header("Ask a question (AI-generated SQL)")
@@ -85,41 +88,22 @@ nl_question = st.text_input(
 )
 
 if st.button("Ask AI") and nl_question:
-    max_attempts = 3
-    sql = None
-    previous_sql = None
-    previous_error = None
-    df = None
-    success = False
+    with st.spinner("Running pipeline..."):
+        result = run_pipeline(nl_question)
 
-    for attempt in range(1, max_attempts + 1):
-        with st.spinner(f"Generating SQL (attempt {attempt}/{max_attempts})..."):
-            sql = generate_sql(nl_question, previous_sql, previous_error)
+    if result.get("sql"):
+        st.subheader("Generated SQL")
+        st.code(result["sql"], language="sql")
 
-        safe, reason = is_safe_sql(sql)
-        if not safe:
-            st.error(f"🛑 Query blocked by safety validator: {reason}")
-            break  # don't retry a safety rejection — that's not a "fix the bug" situation
-
-        try:
-            df = run_query(sql)
-            success = True
-            break  # got a working query, stop retrying
-        except Exception as e:
-            previous_sql = sql
-            previous_error = str(e)
-            st.warning(f"Attempt {attempt} failed: {previous_error}. Retrying..." if attempt < max_attempts else f"Attempt {attempt} failed: {previous_error}")
-
-    st.subheader("Generated SQL")
-    st.code(sql, language="sql")
-
-    if success:
+    if not result.get("safe", True) and not result.get("success"):
+        st.error(f"🛑 Query blocked by safety validator: {result.get('validation_reason')}")
+    elif result.get("success"):
         st.success("✅ Passed safety validation and executed successfully")
 
-        with st.spinner("Analyzing results..."):
-            explanation = explain_result(nl_question, df)
+        df = pd.DataFrame(result["result_records"], columns=result["result_columns"])
+
         st.subheader("Business Insight")
-        st.write(explanation)
+        st.write(result.get("explanation"))
 
         chart = pick_chart(df)
         if chart is not None:
@@ -127,10 +111,8 @@ if st.button("Ask AI") and nl_question:
 
         st.subheader("Result")
         st.dataframe(df)
-    elif df is None and previous_error:
-        st.error(f"Could not generate working SQL after {max_attempts} attempts. Last error: {previous_error}")
-
-st.divider()
+    else:
+        st.error(f"Could not generate working SQL after {result.get('attempt')} attempts. Last error: {result.get('previous_error')}")
 
 # ---------- STEP 4: Predefined questions (kept for comparison) ----------
 st.header("Predefined questions (hardcoded SQL)")
