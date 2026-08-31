@@ -12,8 +12,38 @@ from sql_generator import generate_sql
 from sql_validator import is_safe_sql
 from chart_generator import pick_chart
 from analyst import explain_result
-
+import os
 DB_PATH = "database/insight_ai.db"
+
+def ensure_database_exists():
+    """If insight_ai.db doesn't exist yet (e.g. fresh deployment where the
+    .db file was gitignored), build it from the CSV automatically."""
+    if os.path.exists(DB_PATH):
+        return
+
+    csv_path = "data/superstore.csv"
+    for encoding in ["utf-8", "cp1252", "latin1"]:
+        try:
+            df = pd.read_csv(csv_path, encoding=encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise RuntimeError("Could not read the CSV with any common encoding.")
+
+    df.columns = [c.strip().lower().replace(" ", "_").replace("-", "_") for c in df.columns]
+
+    os.makedirs("database", exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        df.to_sql("orders", conn, if_exists="replace", index=False)
+        conn.commit()
+    finally:
+        conn.close()
+
+ensure_database_exists()
+
+
 
 
 def run_query(sql: str) -> pd.DataFrame:
