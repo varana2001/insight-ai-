@@ -76,7 +76,10 @@ def execute_node(state: GraphState) -> dict:
 
 def explain_node(state: GraphState) -> dict:
     df = pd.DataFrame(state["result_records"], columns=state["result_columns"])
-    explanation = explain_result(state["question"], df)
+    try:
+        explanation = explain_result(state["question"], df)
+    except Exception as e:
+        explanation = f"(Business explanation unavailable due to AI service issue: {e})"
     return {"explanation": explanation}
 
 
