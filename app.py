@@ -86,38 +86,34 @@ nl_question = st.text_input(
     "Ask a business question",
     placeholder="Which region had the highest profit?",
 )
-
 if st.button("Ask AI") and nl_question:
-    if result.get("sql") is None:
-        st.error(f"⚠️ AI service is currently unavailable. {result.get('previous_error', '')} Please try again in a few minutes.")
-    elif result.get("sql"):
-        ...  # rest of your existing display logic
     with st.spinner("Running pipeline..."):
         result = run_pipeline(nl_question)
 
-    if result.get("sql"):
+    if result.get("sql") is None:
+        st.error(f"⚠️ AI service is currently unavailable. {result.get('previous_error', '')} Please try again in a few minutes.")
+    else:
         st.subheader("Generated SQL")
         st.code(result["sql"], language="sql")
 
-    if not result.get("safe", True) and not result.get("success"):
-        st.error(f"🛑 Query blocked by safety validator: {result.get('validation_reason')}")
-    elif result.get("success"):
-        st.success("✅ Passed safety validation and executed successfully")
+        if not result.get("safe", True) and not result.get("success"):
+            st.error(f"🛑 Query blocked by safety validator: {result.get('validation_reason')}")
+        elif result.get("success"):
+            st.success("✅ Passed safety validation and executed successfully")
 
-        df = pd.DataFrame(result["result_records"], columns=result["result_columns"])
+            df = pd.DataFrame(result["result_records"], columns=result["result_columns"])
 
-        st.subheader("Business Insight")
-        st.write(result.get("explanation"))
+            st.subheader("Business Insight")
+            st.write(result.get("explanation"))
 
-        chart = pick_chart(df)
-        if chart is not None:
-            st.plotly_chart(chart, use_container_width=True)
+            chart = pick_chart(df)
+            if chart is not None:
+                st.plotly_chart(chart, use_container_width=True)
 
-        st.subheader("Result")
-        st.dataframe(df)
-    else:
-        st.error(f"Could not generate working SQL after {result.get('attempt')} attempts. Last error: {result.get('previous_error')}")
-
+            st.subheader("Result")
+            st.dataframe(df)
+        else:
+            st.error(f"Could not generate working SQL after {result.get('attempt')} attempts. Last error: {result.get('previous_error')}")
 # ---------- STEP 4: Predefined questions (kept for comparison) ----------
 st.header("Predefined questions (hardcoded SQL)")
 question = st.selectbox(
