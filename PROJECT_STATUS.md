@@ -161,10 +161,12 @@ each piece themselves before moving on. Give code in small chunks tied to one
 file at a time, not large multi-file dumps, and ask the user to run and report
 back before proceeding.
 
-⚠️ Hit Gemini free tier daily quota (20 requests/day) during testing on
-   [today's date]. Confirms need for: (1) graceful error handling for
-   rate-limit errors specifically, not just generic exceptions, and
-   (2) awareness that a deployed public app could hit this limit if
-   multiple people try it — worth mentioning as a known constraint when
-   discussing this project, and a real reason a production system would
-   need a paid tier or its own rate-limiting/caching layer.
+✅ Robust error handling implemented and confirmed working end-to-end:
+   - 503 ServerError (transient outage) → exponential backoff retry
+   - 429 ClientError/RESOURCE_EXHAUSTED (daily quota) → fails fast with
+     clear message, no wasted retries
+   - Both surface as clean UI messages via graph.py's generate_node try/except,
+     not raw tracebacks
+   This was discovered and built during a real ~2 hour session where Gemini's
+   API had a genuine extended outage (503s) followed by hitting the actual
+   daily quota limit from heavy testing/retries during the outage.
