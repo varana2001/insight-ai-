@@ -1,8 +1,9 @@
 """
 analyst.py
 ----------
-Same retry-with-backoff protection as sql_generator.py, since this file
-makes an independent API call and can hit the same transient outages.
+Takes the raw query result and turns it into a short, plain-English business
+explanation. Same retry/quota handling as sql_generator.py, since this makes
+an independent API call and can hit the same transient outages or quota limits.
 """
 
 import os
@@ -23,6 +24,12 @@ def _call_with_retry(prompt: str, max_retries: int = 4):
     for attempt in range(max_retries):
         try:
             return client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        except errors.ClientError as e:
+            if "RESOURCE_EXHAUSTED" in str(e):
+                raise RuntimeError(
+                    "Daily API quota reached. Try again after the quota resets."
+                ) from e
+            raise
         except errors.ServerError as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -31,6 +38,7 @@ def _call_with_retry(prompt: str, max_retries: int = 4):
 
 
 def explain_result(question: str, df: pd.DataFrame) -> str:
+    """Sends the question + result data to Gemini and returns a short business explanation."""
     if df.empty:
         return "The query returned no results."
 

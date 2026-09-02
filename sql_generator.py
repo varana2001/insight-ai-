@@ -1,9 +1,16 @@
 """
 sql_generator.py
 -----------------
+Converts a natural-language question into SQL using Gemini, grounded in the
+live database schema (schema_reader.py) and optional conversation history
+(for resolving references like "that region").
+
 Includes retry-with-exponential-backoff for transient provider outages
-(503 ServerError), separate from the self-correction loop in graph.py which
-handles bad SQL, not provider downtime.
+(503 ServerError), and immediate clean failure for quota errors (429
+ClientError/RESOURCE_EXHAUSTED) — these are different failure modes and
+need different handling: retrying a 503 can help since the server may
+recover in seconds; retrying a daily quota limit never helps, so we fail
+fast with a clear message instead of wasting attempts.
 """
 
 import os
@@ -22,13 +29,25 @@ MODEL_NAME = "gemini-3.6-flash"
 
 
 def _call_with_retry(prompt: str, max_retries: int = 4):
-    """Wraps the actual API call with exponential backoff on transient
-    server errors (503). Re-raises after max_retries so the caller can
-    decide how to handle a persistent outage."""
+    """
+    Wraps the actual API call.
+    - ServerError (503, temporary outage): retry with exponential backoff.
+    - ClientError with RESOURCE_EXHAUSTED (429, daily quota): fail immediately
+      with a clear message — retrying won't help a 24-hour quota limit.
+    - Any other ClientError: fail immediately too, since it's likely a real
+      problem with the request itself, not something a retry would fix.
+    """
     last_error = None
     for attempt in range(max_retries):
         try:
             return client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        except errors.ClientError as e:
+            if "RESOURCE_EXHAUSTED" in str(e):
+                raise RuntimeError(
+                    "Daily API quota reached. Try again after the quota resets "
+                    "(check ai.google.dev for reset timing)."
+                ) from e
+            raise
         except errors.ServerError as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -42,6 +61,10 @@ def generate_sql(
     previous_error: str = None,
     conversation_context: str = "",
 ) -> str:
+    """
+    Sends the question + live schema (+ optional error-correction context +
+    optional recent conversation history) to Gemini and returns raw SQL.
+    """
     schema = get_schema_description()
 
     correction_block = ""
@@ -62,7 +85,8 @@ Error it caused:
 {conversation_context}
 
 If the current question references something from the conversation history
-above, use the history to resolve what it's referring to.
+above (e.g. "that region", "the same period", "now break it down by X"),
+use the history to resolve what it's referring to.
 """
 
     prompt = f"""You are an expert SQL analyst.

@@ -1,9 +1,11 @@
 """
 graph.py
 --------
-Now includes conversation memory: fetches recent history before generating
-SQL (so references like "that region" can resolve), and saves the turn to
-persistent storage after a successful run.
+LangGraph pipeline: generate -> validate -> execute -> (retry on failure) ->
+explain -> save_memory -> END. Includes conversation memory (fetches recent
+history before generating, saves the turn after success) and graceful
+handling of AI-provider failures (outages, quota limits) so they surface as
+a normal failure state instead of crashing the app.
 """
 
 from typing import TypedDict, Optional, List, Dict, Any
@@ -44,16 +46,28 @@ def run_query(sql: str) -> pd.DataFrame:
 
 
 def generate_node(state: GraphState) -> dict:
-    sql = generate_sql(
-        state["question"],
-        state.get("previous_sql"),
-        state.get("previous_error"),
-        state.get("conversation_context", ""),
-    )
-    return {"sql": sql, "attempt": state["attempt"] + 1}
+    try:
+        sql = generate_sql(
+            state["question"],
+            state.get("previous_sql"),
+            state.get("previous_error"),
+            state.get("conversation_context", ""),
+        )
+        return {"sql": sql, "attempt": state["attempt"] + 1}
+    except Exception as e:
+        # Persistent provider outage or quota limit even after retries —
+        # don't crash the whole app, surface it as a normal failure state.
+        return {
+            "sql": None,
+            "attempt": state["max_attempts"],  # force the retry loop to stop
+            "success": False,
+            "previous_error": f"AI provider unavailable: {e}",
+        }
 
 
 def validate_node(state: GraphState) -> dict:
+    if state.get("sql") is None:
+        return {"safe": False, "validation_reason": "No SQL was generated."}
     safe, reason = is_safe_sql(state["sql"])
     return {"safe": safe, "validation_reason": reason}
 
@@ -163,6 +177,7 @@ if __name__ == "__main__":
     result1 = run_pipeline("Which region had the highest profit?")
     print("SQL:", result1.get("sql"))
     print("Result:", result1.get("result_records"))
+    print("Explanation:", result1.get("explanation"))
 
     print("\n--- Follow-up referencing the previous answer ---")
     result2 = run_pipeline("Now show me that region's sales by category")
