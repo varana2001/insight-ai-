@@ -88,6 +88,10 @@ nl_question = st.text_input(
 )
 
 if st.button("Ask AI") and nl_question:
+    if result.get("sql") is None:
+        st.error(f"⚠️ AI service is currently unavailable. {result.get('previous_error', '')} Please try again in a few minutes.")
+    elif result.get("sql"):
+        ...  # rest of your existing display logic
     with st.spinner("Running pipeline..."):
         result = run_pipeline(nl_question)
 
