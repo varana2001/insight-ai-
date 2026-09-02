@@ -1,13 +1,15 @@
 """
 sql_generator.py
 -----------------
-Now accepts optional conversation_context, so references like "that region"
-or "now break it down by month" can be resolved using recent conversation
-history rather than treating every question as fully independent.
+Includes retry-with-exponential-backoff for transient provider outages
+(503 ServerError), separate from the self-correction loop in graph.py which
+handles bad SQL, not provider downtime.
 """
 
 import os
+import time
 from google import genai
+from google.genai import errors
 from dotenv import load_dotenv
 
 from schema_reader import get_schema_description
@@ -19,16 +21,27 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_NAME = "gemini-3.6-flash"
 
 
+def _call_with_retry(prompt: str, max_retries: int = 4):
+    """Wraps the actual API call with exponential backoff on transient
+    server errors (503). Re-raises after max_retries so the caller can
+    decide how to handle a persistent outage."""
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        except errors.ServerError as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s
+    raise last_error
+
+
 def generate_sql(
     question: str,
     previous_sql: str = None,
     previous_error: str = None,
     conversation_context: str = "",
 ) -> str:
-    """
-    Sends the question + live schema (+ optional error-correction context +
-    optional recent conversation history) to Gemini and returns raw SQL.
-    """
     schema = get_schema_description()
 
     correction_block = ""
@@ -49,8 +62,7 @@ Error it caused:
 {conversation_context}
 
 If the current question references something from the conversation history
-above (e.g. "that region", "the same period", "now break it down by X"),
-use the history to resolve what it's referring to.
+above, use the history to resolve what it's referring to.
 """
 
     prompt = f"""You are an expert SQL analyst.
@@ -65,10 +77,7 @@ Rules:
 {correction_block}
 Question: {question}
 """
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-    )
+    response = _call_with_retry(prompt)
     sql = response.text.strip()
     sql = sql.replace("```sql", "").replace("```", "").strip()
     return sql
