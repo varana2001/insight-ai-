@@ -127,8 +127,7 @@ question = st.selectbox(
     ],
 )
 
-if st.button("Analyze"):
-
+if st.button("Analyze", key="analyze_button"):
     if question == "Top 5 products by total sales":
         sql = """
             SELECT product_name, ROUND(SUM(sales), 2) AS total_sales
