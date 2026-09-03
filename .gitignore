@@ -4,3 +4,4 @@ __pycache__/
 database/insight_ai.db
 .env
 graph_diagram.png
+PROJECT_STATUS.md
