@@ -10,6 +10,20 @@ questions like "now break that down by category" resolve correctly.
 > "Which region had the highest profit?" → West
 > "Now show me that region's sales by category" → correctly resolves "that region" to West using conversation history
 
+## Screenshots
+
+**Asking a question — pipeline running:**
+![Ask AI running](screenshots/d.png)
+
+**First question answered — SQL generated, safety validation passed, correct result:**
+![Generated SQL and result](screenshots/e.png)
+
+**Follow-up question using conversation memory — "that region" correctly resolved to West without restating it:**
+![Memory follow-up](screenshots/a.png)
+
+**Predefined hardcoded questions, shown for comparison against AI-generated SQL:**
+![Predefined questions](screenshots/f.png)
+
 ## Architecture
 
 ![Architecture](graph_diagram.png)
