@@ -128,6 +128,7 @@ question = st.selectbox(
 )
 
 if st.button("Analyze", key="analyze_button"):
+
     if question == "Top 5 products by total sales":
         sql = """
             SELECT product_name, ROUND(SUM(sales), 2) AS total_sales
@@ -137,3 +138,48 @@ if st.button("Analyze", key="analyze_button"):
             LIMIT 5;
         """
         df = run_query(sql)
+        st.dataframe(df)
+        st.bar_chart(df.set_index("product_name")["total_sales"])
+
+    elif question == "Profit by region":
+        sql = """
+            SELECT region, ROUND(SUM(profit), 2) AS total_profit
+            FROM orders
+            GROUP BY region
+            ORDER BY total_profit DESC;
+        """
+        df = run_query(sql)
+        st.dataframe(df)
+        st.bar_chart(df.set_index("region")["total_profit"])
+
+    elif question == "Monthly sales trend":
+        sql = "SELECT order_date, sales FROM orders;"
+        df = run_query(sql)
+        df["order_date"] = pd.to_datetime(df["order_date"], format="%m/%d/%Y")
+        df["month"] = df["order_date"].dt.to_period("M").astype(str)
+        monthly = df.groupby("month")["sales"].sum().reset_index()
+        st.dataframe(monthly)
+        st.line_chart(monthly.set_index("month")["sales"])
+
+    elif question == "Top 5 customers by total sales":
+        sql = """
+            SELECT customer_name, ROUND(SUM(sales), 2) AS total_sales
+            FROM orders
+            GROUP BY customer_name
+            ORDER BY total_sales DESC
+            LIMIT 5;
+        """
+        df = run_query(sql)
+        st.dataframe(df)
+        st.bar_chart(df.set_index("customer_name")["total_sales"])
+
+    elif question == "Sales by category":
+        sql = """
+            SELECT category, ROUND(SUM(sales), 2) AS total_sales
+            FROM orders
+            GROUP BY category
+            ORDER BY total_sales DESC;
+        """
+        df = run_query(sql)
+        st.dataframe(df)
+        st.bar_chart(df.set_index("category")["total_sales"])
